@@ -1,49 +1,72 @@
-from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from ..repository.db import Base
+from sqlalchemy.ext.declarative import declarative_base
+from cupidy.db.repository.db import Base
 
 class User(Base):
     __tablename__ = "users"
     
-    user_id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password = Column(String, nullable=False)
+    allow_privacy_policy = Column(Boolean, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
 
-    profile = relationship("Profile", back_populates="user", uselist=False)
-    user_profile_detail = relationship("UserProfileDetail", back_populates="user", uselist=False)
-    photos = relationship("Photo", back_populates="user")
+    # Relationship to UserProfile
+    profile = relationship("UserProfile", back_populates="user", uselist=False)
+    # Relationship to ProfilePhoto
+    photos = relationship("ProfilePhoto", back_populates="user")
 
-class Profile(Base):
-    __tablename__ = "profiles"
+    # Relationship to PasswordResetRequest
+    password_reset_requests = relationship("PasswordResetRequest", back_populates="user")
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
     
-    user_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    full_name = Column(String)
+    birthdate = Column(Date)
     gender = Column(String)
-    location = Column(String)
-    profile_picture_url = Column(String)
-    name = Column(String)
-    birthday = Column(Date)
-    
-    user = relationship("User", back_populates="profile")
-
-class UserProfileDetail(Base):
-    __tablename__ = "user_profile_details"
-    
-    user_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True, unique=True)
-    bio = Column(Text)
-    looking_for = Column(String)
-    mbti_type = Column(String)
-    interests = Column(Text)
-    school = Column(String)
+    interested_in = Column(String)
+    interests = Column(Text)  # Using Text for array-like data
     zodiac_sign = Column(String)
+    mbti = Column(String)
+    country_name = Column(String)
+    city = Column(String)
+    locality = Column(String)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
     
-    user = relationship("User", back_populates="user_profile_detail")
+    # Relationship back to User
+    user = relationship("User", back_populates="profile")
+    # Relationship to ProfilePhoto
+    photos = relationship("ProfilePhoto", back_populates="user_profile")
 
-class Photo(Base):
-    __tablename__ = "photos"
+class ProfilePhoto(Base):
+    __tablename__ = "profile_photos"
     
-    photo_id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    photo_url = Column(String, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # ForeignKey to User
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)  # ForeignKey to UserProfile
+    title = Column(String)
+    url = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
     
+    # Relationships
+    user_profile = relationship("UserProfile", back_populates="photos")
     user = relationship("User", back_populates="photos")
+
+class PasswordResetRequest(Base):
+    __tablename__ = "password_reset_requests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reset_token = Column(String, unique=True, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    
+    # Relationship back to User
+    user = relationship("User", back_populates="password_reset_requests")

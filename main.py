@@ -1,8 +1,12 @@
 from fastapi import FastAPI
 from cupidy.middleware.auth import ExampleMiddleware
 from cupidy.api import api_router
+from cupidy.db.repository.db import init_db
 
 app = FastAPI()
+
+# Initialize database schema
+init_db()
 
 app.add_middleware(ExampleMiddleware)
 
