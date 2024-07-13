@@ -17,5 +17,8 @@ def login():
 
 @router.post("/refresh")
 def get_new_access_token(refresh_token: dict = Body(...)):
-    mock_db_data = {"name":"linpyae","rk":"hhh243"}
-    return {validate_refresh_token(refresh_token["refresh_token"])}
+    try:
+        new_token_set = validate_refresh_token(refresh_token["refresh_token"])
+    except Exception as e:
+        return {"error": str(e)}
+    return new_token_set

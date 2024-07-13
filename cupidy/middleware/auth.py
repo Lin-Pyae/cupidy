@@ -18,7 +18,7 @@ def checkTokenValidation(token):
     
 class AccessToken(AuthenticationBackend):
     async def authenticate(self, request: Request):
-        if request.url.path.endswith('login'):
+        if request.url.path.endswith(('login','refresh')):
             return
         if "Authorization" not in request.headers:
             raise AuthenticationError("Please provide Authorization in headers")

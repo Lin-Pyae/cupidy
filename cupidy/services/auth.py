@@ -21,6 +21,8 @@ def generate_refresh_token():
 
 def validate_refresh_token(refresh_token):
     checkTokenValidation(refresh_token,rt_secret_key)
-    return {"access_token":generate_token({"name":"johndoe","age":12}),"refresh_token":generate_refresh_token()}
+    access_token = generate_token({"name":"johndoe","age":12})
+    refresh_token = generate_refresh_token()
+    return {"access_token":access_token,"refresh_token":refresh_token}
     
 
