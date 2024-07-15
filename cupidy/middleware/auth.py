@@ -17,6 +17,12 @@ def checkTokenValidation(token):
         raise AuthenticationError("Unknown token error")
     
 class AccessToken(AuthenticationBackend):
+    @staticmethod
+    def auth_error(request, exception):
+        """Handle authentication error routed by Authentication Middleware.
+        """
+        return JSONResponse({"error": str(exception)}, status_code=401)
+    
     async def authenticate(self, request: Request):
         if request.url.path.endswith(('login','refresh')):
             return

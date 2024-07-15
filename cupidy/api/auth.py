@@ -17,8 +17,5 @@ def login():
 
 @router.post("/refresh")
 def get_new_access_token(refresh_token: dict = Body(...)):
-    try:
-        new_token_set = validate_refresh_token(refresh_token["refresh_token"])
-    except Exception as e:
-        return {"error": str(e)}
+    new_token_set = validate_refresh_token(refresh_token["refresh_token"])
     return new_token_set

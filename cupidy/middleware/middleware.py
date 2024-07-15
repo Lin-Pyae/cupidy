@@ -9,7 +9,8 @@ def middleware_stack():
     stack = list()
     stack.append(Middleware(
         AuthenticationMiddleware,
-        backend=AccessToken()))
+        backend=AccessToken(),
+        on_error=AccessToken.auth_error))
     
     return stack
 
