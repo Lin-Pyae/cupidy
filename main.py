@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from cupidy.middleware.middleware import middleware_stack
 from cupidy.api import api_router
+from cupidy.db.repository.db import init_db
 
 app = FastAPI(middleware=middleware_stack())
 

@@ -5,7 +5,12 @@ name = "pypi"
 
 [packages]
 fastapi = "*"
+<<<<<<< HEAD
 pyjwt = "*"
+=======
+sqlalchemy = "*"
+passlib = "*"
+>>>>>>> master
 
 [dev-packages]
 

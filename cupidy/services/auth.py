@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 at_secret_key = "secretkeyforcupidy"
 rt_secret_key = "refreshkey"
-access_token_expire_seconds = 30
+access_token_expire_seconds = 1800
 refresh_token_expire_seconds = 120
 
 def generate_token(usr_data):
