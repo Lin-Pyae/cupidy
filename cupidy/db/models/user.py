@@ -64,9 +64,10 @@ class PasswordResetRequest(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reset_token = Column(String, unique=True, nullable=False)
+    otp = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, nullable=False)
     expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, nullable=False)
     
     # Relationship back to User
     user = relationship("User", back_populates="password_reset_requests")
