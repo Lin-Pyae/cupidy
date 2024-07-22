@@ -2,19 +2,38 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 from passlib.context import CryptContext
+from typing import List, Optional
+from datetime import datetime, date
 
 from cupidy.db.repository.db import SessionLocal
 from cupidy.db.repository.user import (get_users, create_user, get_user_by_email,
                                         create_password_reset_request,
                                           make_only_one_usable_otp, OTP_validation,
-                                          change_password)
+                                          change_password, create_user_profile)
 from fastapi.responses import JSONResponse
 from cupidy.services.email import send_otp
 from datetime import datetime, timedelta
+from cupidy.db.models.user import User, UserProfile
 
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class UserProfileCreate(BaseModel):
+    user_id: int
+    full_name: Optional[str] = None
+    birthdate: Optional[date] = None
+    gender: Optional[str] = None
+    interested_in: Optional[str] = None
+    interests: Optional[List[str]] = None
+    zodiac_sign: Optional[str] = None
+    mbti: Optional[str] = None
+    country_name: Optional[str] = None
+    city: Optional[str] = None
+    locality: Optional[str] = None
+
+    class Config:
+        orm_mode = True
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -29,16 +48,14 @@ def get_db():
     finally:
         db.close()
 
-# Route to get all users
-
 @router.get("/")
 def testFunction():
     return "Hello Testing123"
 
 import logging
-
 logger = logging.getLogger(__name__)
 
+# Route to get all users
 @router.get("/users")
 def read_users(db: Session = Depends(get_db)):
     try:
@@ -53,13 +70,17 @@ def read_users(db: Session = Depends(get_db)):
 # Route to sign up a new user
 @router.post("/signup", response_model=UserCreate)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = pwd_context.hash(user.password)
-    new_user = create_user(db=db, user=user, hashed_password=hashed_password)
-    return new_user
+    try:
+        db_user = get_user_by_email(db, email=user.email)
+        if db_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        hashed_password = pwd_context.hash(user.password)
+        new_user = create_user(db=db, user=user, hashed_password=hashed_password)
+        return new_user
+    except Exception as e:
+        logger.error(f"Error during user signup: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/signin")
 def sign_in(userinfo: dict = Body(...), db: Session = Depends(get_db)):
@@ -117,6 +138,16 @@ def reset_password(detail: dict=Body(...), db: Session=Depends(get_db)):
         return JSONResponse(content={"error":str(e)}, status_code=400)
     return JSONResponse(content={"message":"Successfully changed password"}, status_code=200)
 
-
-    
-
+# Route to add detailed user profile information
+@router.post("/detailinfo", response_model=UserProfileCreate)
+def add_user_profile(user_profile: UserProfileCreate, db: Session = Depends(get_db)):
+    try:
+        db_user = db.query(User).filter(User.id == user_profile.user_id).first()
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        new_profile = create_user_profile(db=db, user_profile=user_profile, user_id=db_user.id)
+        return new_profile
+    except Exception as e:
+        logger.error(f"Error adding user profile: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -1,7 +1,11 @@
 from sqlalchemy.orm import Session
 from cupidy.db.models.user import User, UserProfile, ProfilePhoto, PasswordResetRequest
 from pydantic import EmailStr
+<<<<<<< HEAD
 from datetime import datetime
+=======
+from datetime import datetime, date
+>>>>>>> refs/remotes/origin/master
 
 # Getting all users from the database to test
 def get_users(db: Session):
@@ -26,9 +30,9 @@ def create_user(db: Session, user, hashed_password: str):
     return db_user
 
 # Adding detailed user profile information
-def create_user_profile(db: Session, user_profile):
+def create_user_profile(db: Session, user_profile, user_id: int):
     db_profile = UserProfile(
-        user_id=user_profile.user_id,
+        user_id=user_id,
         full_name=user_profile.full_name,
         birthdate=user_profile.birthdate,
         gender=user_profile.gender,
@@ -38,7 +42,9 @@ def create_user_profile(db: Session, user_profile):
         mbti=user_profile.mbti,
         country_name=user_profile.country_name,
         city=user_profile.city,
-        locality=user_profile.locality
+        locality=user_profile.locality,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     db.add(db_profile)
     db.commit()
