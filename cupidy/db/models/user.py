@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Date, Boolean, DateTime, ForeignKey, Text, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from cupidy.db.repository.db import Base
@@ -52,7 +52,8 @@ class ProfilePhoto(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # ForeignKey to User
     # user_profile_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)  # ForeignKey to UserProfile
     title = Column(String)
-    url = Column(Text, nullable=False)
+    blob = Column(LargeBinary, nullable=False)
+    # url = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     

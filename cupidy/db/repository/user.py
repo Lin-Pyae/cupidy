@@ -6,30 +6,48 @@ import os
 from fastapi import UploadFile
 from uuid import uuid4
 
-# Directory where images will be stored
-UPLOAD_DIR = "uploads/"
+# # Directory where images will be stored url format
+# UPLOAD_DIR = "uploads/"
 
-# Ensure the upload directory exists
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# # Ensure the upload directory exists
+# os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# def save_profile_photo(file: UploadFile, user_id: int, db: Session):
+#     # Count existing photos for the user to determine the next photo number
+#     photo_count = db.query(ProfilePhoto).filter(ProfilePhoto.user_id == user_id).count()
+    
+#     # Generate a unique filename based on user ID and the next photo number
+#     file_extension = file.filename.split(".")[-1]
+#     filename = f"user_{user_id}_photo_{photo_count + 1}.{file_extension}"
+#     filepath = os.path.join(UPLOAD_DIR, filename)
+    
+#     # Save the file
+#     with open(filepath, "wb") as f:
+#         f.write(file.file.read())
+    
+#     # Create a database entry
+#     photo = ProfilePhoto(
+#         user_id=user_id,
+#         title=file.filename,
+#         url=filepath,
+#         created_at=datetime.utcnow(),
+#         updated_at=datetime.utcnow()
+#     )
+#     db.add(photo)
+#     db.commit()
+#     db.refresh(photo)
+#     return photo
+
+#Saving User Photos in database
 def save_profile_photo(file: UploadFile, user_id: int, db: Session):
-    # Count existing photos for the user to determine the next photo number
-    photo_count = db.query(ProfilePhoto).filter(ProfilePhoto.user_id == user_id).count()
+    # Read the file content as binary data
+    file_data = file.file.read()
     
-    # Generate a unique filename based on user ID and the next photo number
-    file_extension = file.filename.split(".")[-1]
-    filename = f"user_{user_id}_photo_{photo_count + 1}.{file_extension}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-    
-    # Save the file
-    with open(filepath, "wb") as f:
-        f.write(file.file.read())
-    
-    # Create a database entry
+    # Create a database entry with the binary data
     photo = ProfilePhoto(
         user_id=user_id,
         title=file.filename,
-        url=filepath,
+        blob=file_data,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
