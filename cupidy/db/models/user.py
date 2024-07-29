@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, DateTime, ForeignKey, Text, LargeBinary
+from sqlalchemy import Column, Integer, String, Date, Boolean, DateTime, ForeignKey, Text, func, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from cupidy.db.repository.db import Base
@@ -11,8 +11,8 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
     allow_privacy_policy = Column(Boolean, nullable=False)
-    created_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     # Relationship to UserProfile
     profile = relationship("UserProfile", back_populates="user", uselist=False)
@@ -66,9 +66,10 @@ class PasswordResetRequest(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reset_token = Column(String, unique=True, nullable=False)
+    otp = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, nullable=False)
     expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, nullable=False)
     
     # Relationship back to User
     user = relationship("User", back_populates="password_reset_requests")

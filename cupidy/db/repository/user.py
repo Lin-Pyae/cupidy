@@ -69,7 +69,9 @@ def create_user(db: Session, user, hashed_password: str):
     db_user = User(
         email=user.email,
         password=hashed_password,
-        allow_privacy_policy=user.allow_privacy_policy
+        allow_privacy_policy=user.allow_privacy_policy,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     db.add(db_user)
     db.commit()
@@ -111,13 +113,45 @@ def add_profile_photo(db: Session, photo):
     return db_photo
 
 # Creating a password reset request
-def create_password_reset_request(db: Session, user_id: int, reset_token: str, expires_at):
+def create_password_reset_request(db: Session, user_id: int, otp: str, expires_at):
     db_reset_request = PasswordResetRequest(
         user_id=user_id,
-        reset_token=reset_token,
-        expires_at=expires_at
+        otp=otp,
+        created_at=datetime.now(),
+        expires_at=expires_at,
+        is_used = False
     )
     db.add(db_reset_request)
     db.commit()
     db.refresh(db_reset_request)
     return db_reset_request
+
+def make_only_one_usable_otp(db: Session, user_id: int):
+    db.query(PasswordResetRequest).filter(
+        PasswordResetRequest.user_id == user_id, PasswordResetRequest.is_used == False).update(
+        {PasswordResetRequest.is_used: True},
+        synchronize_session=False
+    )
+    db.commit()
+
+def OTP_validation(db: Session, otp: str):
+    user_requested_otp = db.query(PasswordResetRequest).filter(
+                        PasswordResetRequest.otp == otp, PasswordResetRequest.is_used == False).first()
+    
+    if not user_requested_otp:
+        raise Exception("Invalid OTP")
+    
+    if datetime.now() > user_requested_otp.expires_at:
+        raise Exception("OTP expired")
+    
+    user_requested_otp.is_used = True
+
+    db.commit()
+
+def change_password(db: Session, user_id, new_password):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise Exception("User not found")
+    
+    user.password = new_password
+    db.commit()
