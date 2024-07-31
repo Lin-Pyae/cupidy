@@ -84,18 +84,22 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/signin")
 def sign_in(userinfo: dict = Body(...), db: Session = Depends(get_db)):
-    if "email" and "password" not in userinfo:
-        return JSONResponse(content={"error":"insufficient login informations"},status_code=400)
+    if "email" not in userinfo or "password" not in userinfo:
+        return JSONResponse(content={"error": "Insufficient login information"}, status_code=400)
+
     user_email = userinfo.get("email")
     user_password = userinfo.get("password")
     db_user = get_user_by_email(db, email=user_email)
     if not db_user:
-        return JSONResponse(content={"message":"user not found"}, status_code=404)
+        return JSONResponse(content={"error": "User not found"}, status_code=404)
+
     db_user_pw = db_user.password
 
-    if not pwd_context.verify(user_password,db_user_pw):
-        return JSONResponse(content={"message":"incorrect user password"}, status_code=403)
-    return JSONResponse(content={"message":"login success"}, status_code=200)
+    if not pwd_context.verify(user_password, db_user_pw):
+        return JSONResponse(content={"error": "Incorrect password"}, status_code=403)
+
+    return JSONResponse(content={"message": "Login successful"}, status_code=200)
+
 
 @router.post("/otp-request")
 def reset_otp_request(useremail: dict = Body(...), db: Session = Depends(get_db)):
