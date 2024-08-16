@@ -24,7 +24,7 @@ def send_otp(usr_email):
     otp = generateOTP()
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-        server.login("cupidyhepta@gmail.com", "ykzt srhc qavt zbnb")
+        server.login("cupidyhepta@gmail.com", "dpee rrol wvcm jcfp")
         message = f"""\
         Subject: Sending OTP
 

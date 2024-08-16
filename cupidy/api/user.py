@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from cupidy.services.email import send_otp
 from datetime import datetime, timedelta
 from cupidy.db.models.user import User, UserProfile, ProfilePhoto
+from cupidy.services.auth import generate_token
 
 router = APIRouter()
 
@@ -97,8 +98,8 @@ def sign_in(userinfo: dict = Body(...), db: Session = Depends(get_db)):
 
     if not pwd_context.verify(user_password, db_user_pw):
         return JSONResponse(content={"error": "Incorrect password"}, status_code=403)
-
-    return JSONResponse(content={"message": "Login successful"}, status_code=200)
+    access_token, refresh_token = generate_token({"user_id":db_user.id, "email":db_user.email})
+    return {"access_token":access_token, "refresh_token":refresh_token}
 
 
 @router.post("/otp-request")

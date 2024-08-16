@@ -24,7 +24,7 @@ class AccessToken(AuthenticationBackend):
         return JSONResponse({"error": str(exception)}, status_code=401)
     
     async def authenticate(self, request: Request):
-        if request.url.path.endswith(('login','refresh','signin','docs','/openapi.json')):
+        if request.url.path.endswith(('login','refresh','signin','docs','/openapi.json', 'signup', '/otp-request', 'otp-validate', 'password-reset')):
             return
         if "Authorization" not in request.headers:
             raise AuthenticationError("Please provide Authorization in headers")
