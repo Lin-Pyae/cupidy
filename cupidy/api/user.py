@@ -41,6 +41,23 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=6)
     allow_privacy_policy: bool
 
+class UserResponse(BaseModel):
+    id: int
+    email: EmailStr
+    allow_privacy_policy: bool
+
+    class Config:
+        orm_mode = True
+
+class PhotoData(BaseModel):
+    title: str
+    url: str
+    type: Optional[str] = "gallery"  # Default to 'gallery' if 'type' is not provided
+
+class UploadPhotosRequest(BaseModel):
+    user_id: int
+    photos: List[PhotoData]
+
 # Dependency to get DB session
 def get_db():
     db = SessionLocal()
@@ -69,7 +86,7 @@ def read_users(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 # Route to sign up a new user
-@router.post("/signup", response_model=UserCreate)
+@router.post("/signup", response_model=UserResponse)
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     try:
         db_user = get_user_by_email(db, email=user.email)
@@ -78,7 +95,11 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
         
         hashed_password = pwd_context.hash(user.password)
         new_user = create_user(db=db, user=user, hashed_password=hashed_password)
-        return new_user
+        return UserResponse(
+            id=new_user.id,
+            email=new_user.email,
+            allow_privacy_policy=new_user.allow_privacy_policy
+        )
     except Exception as e:
         logger.error(f"Error during user signup: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -157,44 +178,24 @@ def add_user_profile(user_profile: UserProfileCreate, db: Session = Depends(get_
         logger.error(f"Error adding user profile: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
     
-# # Route to upload a profile photo url format
-# @router.post("/upload_photos")
-# def upload_photos(user_id: int = Form(...), files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
-#     try:
-#         db_user = db.query(User).filter(User.id == user_id).first()
-#         if not db_user:
-#             raise HTTPException(status_code=404, detail="User not found")
-        
-#         if len(files) > 6:
-#             raise HTTPException(status_code=400, detail="You can upload a maximum of 6 files.")
-        
-#         uploaded_files = []
-#         for file in files:
-#             photo = save_profile_photo(file=file, user_id=user_id, db=db)
-#             uploaded_files.append({"filename": photo.title, "url": photo.url})
-        
-#         return uploaded_files
-#     except HTTPException as http_exc:
-#         logger.error(f"HTTP error: {http_exc.detail}")
-#         raise http_exc
-#     except Exception as e:
-#         logger.error(f"Unexpected error: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
 @router.post("/upload_photos")
-def upload_photos(user_id: int = Form(...), files: List[UploadFile] = File(...), db: Session = Depends(get_db)):
+def upload_photos(request: UploadPhotosRequest, db: Session = Depends(get_db)):
     try:
-        db_user = db.query(User).filter(User.id == user_id).first()
+        db_user = db.query(User).filter(User.id == request.user_id).first()
         if not db_user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        if len(files) > 6:
-            raise HTTPException(status_code=400, detail="You can upload a maximum of 6 files.")
+        if len(request.photos) > 6:
+            raise HTTPException(status_code=400, detail="You can upload a maximum of 6 photos.")
         
         uploaded_files = []
-        for file in files:
-            photo = save_profile_photo(file=file, user_id=user_id, db=db)
-            uploaded_files.append({"filename": photo.title})
+        for photo_data in request.photos:
+            photo = save_profile_photo(photo_data=photo_data.dict(), user_id=request.user_id, db=db)
+            uploaded_files.append({
+                "title": photo.title,
+                "url": photo.url,
+                "type": photo.type
+            })
         
         return uploaded_files
     except HTTPException as http_exc:
@@ -203,22 +204,6 @@ def upload_photos(user_id: int = Form(...), files: List[UploadFile] = File(...),
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
-# # Route to get all photos of a user url format
-# @router.get("/users/{user_id}/photos")
-# def get_user_photos(user_id: int, db: Session = Depends(get_db)):
-#     try:
-#         db_user = db.query(User).filter(User.id == user_id).first()
-#         if not db_user:
-#             raise HTTPException(status_code=404, detail="User not found")
-        
-#         photos = db.query(ProfilePhoto).filter(ProfilePhoto.user_id == user_id).all()
-#         return photos
-#     except Exception as e:
-#         logger.error(f"Error retrieving photos: {str(e)}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
-
-import base64
 
 @router.get("/users/{user_id}/photos")
 def get_user_photos(user_id: int, db: Session = Depends(get_db)):
@@ -234,7 +219,8 @@ def get_user_photos(user_id: int, db: Session = Depends(get_db)):
             photo_data = {
                 "id": photo.id,
                 "title": photo.title,
-                "blob": base64.b64encode(photo.blob).decode('utf-8'),  # Encode as base64 string
+                "url": photo.url,
+                "type": photo.type,
                 "created_at": photo.created_at,
                 "updated_at": photo.updated_at
             }
@@ -243,4 +229,58 @@ def get_user_photos(user_id: int, db: Session = Depends(get_db)):
         return photo_list
     except Exception as e:
         logger.error(f"Error retrieving photos: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/match/{user_id}")
+def get_matching_users(user_id: int, db: Session = Depends(get_db)):
+    try:
+        # Get the current user's profile
+        current_user_profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+        if not current_user_profile:
+            raise HTTPException(status_code=404, detail="User profile not found")
+
+        # Calculate age from birthdate
+        if not current_user_profile.birthdate:
+            raise HTTPException(status_code=400, detail="Birthdate not available for age calculation")
+        today = datetime.today().date()
+        age = today.year - current_user_profile.birthdate.year - ((today.month, today.day) < (current_user_profile.birthdate.month, current_user_profile.birthdate.day))
+
+        # Determine the age range (4 years younger and older)
+        min_age = age - 4
+        max_age = age + 4
+
+        # Find potential matches
+        potential_matches = db.query(UserProfile).filter(
+            UserProfile.user_id != user_id,  # Exclude the current user
+            UserProfile.gender == current_user_profile.interested_in,  # Match gender preference
+            UserProfile.city == current_user_profile.city,  # Match by city
+            UserProfile.birthdate.isnot(None)  # Ensure the birthdate is available
+        ).all()
+
+        # Further filter by age range
+        matching_users = []
+        for match in potential_matches:
+            match_age = today.year - match.birthdate.year - ((today.month, today.day) < (match.birthdate.month, match.birthdate.day))
+            if min_age <= match_age <= max_age:
+                # Check if the zodiac signs are compatible
+                if match.zodiac_sign in current_user_profile.compatible_zodiac_signs:
+                    # Check if there are common interests
+                    if set(current_user_profile.interests).intersection(set(match.interests)):
+                        matching_users.append({
+                            "user_id": match.user_id,
+                            "name": match.full_name,
+                            "age": match_age,
+                            "photo": match.profile_photo_url,  # Adjust if the photo URL is stored differently
+                            "city": match.city,
+                            "interests": match.interests,
+                            "zodiac_sign": match.zodiac_sign
+                        })
+
+        return matching_users
+
+    except HTTPException as http_exc:
+        logger.error(f"HTTP error: {http_exc.detail}")
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
