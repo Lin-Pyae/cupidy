@@ -39,15 +39,13 @@ from uuid import uuid4
 #     return photo
 
 #Saving User Photos in database
-def save_profile_photo(file: UploadFile, user_id: int, db: Session):
-    # Read the file content as binary data
-    file_data = file.file.read()
-    
-    # Create a database entry with the binary data
+def save_profile_photo(photo_data: dict, user_id: int, db: Session):
+    # Create a database entry using the URL format
     photo = ProfilePhoto(
         user_id=user_id,
-        title=file.filename,
-        blob=file_data,
+        title=photo_data.get('title', 'Untitled'),
+        url=photo_data['url'],  # Ensure 'url' is present in the incoming data
+        type=photo_data.get('type', 'gallery'),  # Default to 'gallery' if 'type' is not provided
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
@@ -99,18 +97,6 @@ def create_user_profile(db: Session, user_profile, user_id: int):
     db.commit()
     db.refresh(db_profile)
     return db_profile
-
-# Adding a profile photo
-def add_profile_photo(db: Session, photo):
-    db_photo = ProfilePhoto(
-        user_profile_id=photo.user_profile_id,
-        title=photo.title,
-        url=photo.url
-    )
-    db.add(db_photo)
-    db.commit()
-    db.refresh(db_photo)
-    return db_photo
 
 # Creating a password reset request
 def create_password_reset_request(db: Session, user_id: int, otp: str, expires_at):
