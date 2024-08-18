@@ -6,7 +6,7 @@ from typing import List, Optional
 from datetime import datetime, date
 
 from cupidy.db.repository.db import SessionLocal
-from cupidy.db.repository.user import (get_users, create_user, get_user_by_email,
+from cupidy.db.repository.user import (get_users, create_user, get_user_by_email,get_user_by_id,
                                         create_password_reset_request,
                                           make_only_one_usable_otp, OTP_validation,
                                           change_password, create_user_profile, save_profile_photo)
@@ -86,7 +86,7 @@ def read_users(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 # Route to sign up a new user
-@router.post("/signup", response_model=UserResponse)
+@router.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     try:
         db_user = get_user_by_email(db, email=user.email)
@@ -95,14 +95,12 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
         
         hashed_password = pwd_context.hash(user.password)
         new_user = create_user(db=db, user=user, hashed_password=hashed_password)
-        return UserResponse(
-            id=new_user.id,
-            email=new_user.email,
-            allow_privacy_policy=new_user.allow_privacy_policy
-        )
+        access_token, refresh_token = generate_token({"user_id":new_user.id, "email":new_user.email})
+        return {"access_token":access_token, "refresh_token":refresh_token}
+    
     except Exception as e:
         logger.error(f"Error during user signup: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/signin")
 def sign_in(userinfo: dict = Body(...), db: Session = Depends(get_db)):
@@ -284,3 +282,12 @@ def get_matching_users(user_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+@router.get("/detailInfo/{user_id}")
+def detail_info(user_id: int, db: Session = Depends(get_db)):
+    usr_info, detail = get_user_by_id(db, user_id)
+    all_usr_info = {**usr_info.__dict__, **detail.__dict__}
+    all_usr_info.pop("password")
+    all_usr_info.pop("_sa_instance_state")
+    all_usr_info.pop("id")
+    return all_usr_info
