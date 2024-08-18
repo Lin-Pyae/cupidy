@@ -62,6 +62,11 @@ def get_users(db: Session):
 def get_user_by_email(db: Session, email: EmailStr):
     return db.query(User).filter(User.email == email).first()
 
+# Getting a user by id
+def get_user_by_id(db: Session, id: int):
+    # return db.query(User).filter(User.id == id).first()
+    return db.query(User,UserProfile).join(UserProfile).filter(User.id == id).first()
+
 # Creating a new user
 def create_user(db: Session, user, hashed_password: str):
     db_user = User(
