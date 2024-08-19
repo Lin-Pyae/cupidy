@@ -64,7 +64,7 @@ def get_user_by_email(db: Session, email: EmailStr):
 
 # Getting a user by id
 def get_user_by_id(db: Session, id: int):
-    user = db.query(User,UserProfile, ProfilePhoto).join(UserProfile).join(ProfilePhoto).filter(User.id == id).first()
+    user = db.query(User,UserProfile).join(UserProfile).filter(User.id == id).first()
     if not user:
         raise Exception("User not found")
     return user
