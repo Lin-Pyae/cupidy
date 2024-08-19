@@ -8,7 +8,8 @@ app = FastAPI(middleware=middleware_stack())
 
 origins = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173", 
+    "http://127.0.0.1:5173",
+    "https://cupidy-dating.vercel.app"
 ]
 
 app.add_middleware(

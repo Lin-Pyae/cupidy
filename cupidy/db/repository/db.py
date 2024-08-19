@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 #ShineBoBo DATABASE_URL
 DATABASE_URL = "postgresql://postgres:    @localhost:5432/CupidyWebsite"
 
+
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
