@@ -3,6 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # Replace with actual URL eg:DatabaseServer://username:password@server/DatabaseName
+# DATABASE_URL = "postgresql://postgres:passwd@localhost:5432/cupidywebsite"
+
+#ShineBoBo DATABASE_URL
 DATABASE_URL = "postgresql://postgres:passwd@localhost:5432/cupidywebsite"
 
 

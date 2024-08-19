@@ -64,8 +64,10 @@ def get_user_by_email(db: Session, email: EmailStr):
 
 # Getting a user by id
 def get_user_by_id(db: Session, id: int):
-    # return db.query(User).filter(User.id == id).first()
-    return db.query(User,UserProfile).join(UserProfile).filter(User.id == id).first()
+    user = db.query(User,UserProfile, ProfilePhoto).join(UserProfile).join(ProfilePhoto).filter(User.id == id).first()
+    if not user:
+        raise Exception("User not found")
+    return user
 
 # Creating a new user
 def create_user(db: Session, user, hashed_password: str):
@@ -139,8 +141,8 @@ def OTP_validation(db: Session, otp: str):
 
     db.commit()
 
-def change_password(db: Session, user_id, new_password):
-    user = db.query(User).filter(User.id == user_id).first()
+def change_password(db: Session, user_email, new_password):
+    user = db.query(User).filter(User.email == user_email).first()
     if not user:
         raise Exception("User not found")
     

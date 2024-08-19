@@ -151,13 +151,13 @@ def otp_validation(otp: dict=Body(...), db: Session=Depends(get_db)):
 
 @router.post("/password-reset")
 def reset_password(detail: dict=Body(...), db: Session=Depends(get_db)):
-    is_enough_info = set(["new_password","user_id"]) <= set(detail.keys())
+    is_enough_info = set(["new_password","user_email"]) <= set(detail.keys())
     if not is_enough_info:
         return JSONResponse(content={"error":"not enough informations provided"}, status_code=400)
     
     new_pass = pwd_context.hash(detail["new_password"])
     try:
-        change_password(db, detail["user_id"], new_pass)
+        change_password(db, detail["user_email"], new_pass)
     except Exception as e:
         return JSONResponse(content={"error":str(e)}, status_code=400)
     return JSONResponse(content={"message":"Successfully changed password"}, status_code=200)
@@ -241,38 +241,52 @@ def get_matching_users(user_id: int, db: Session = Depends(get_db)):
         if not current_user_profile.birthdate:
             raise HTTPException(status_code=400, detail="Birthdate not available for age calculation")
         today = datetime.today().date()
-        age = today.year - current_user_profile.birthdate.year - ((today.month, today.day) < (current_user_profile.birthdate.month, current_user_profile.birthdate.day))
+        age = today.year - current_user_profile.birthdate.year - (
+            (today.month, today.day) < (current_user_profile.birthdate.month, current_user_profile.birthdate.day)
+        )
 
         # Determine the age range (4 years younger and older)
         min_age = age - 4
         max_age = age + 4
 
+        # Parse interests into a list
+        user_interests = set(current_user_profile.interests.split(","))
+
         # Find potential matches
         potential_matches = db.query(UserProfile).filter(
-            UserProfile.user_id != user_id,  # Exclude the current user
-            UserProfile.gender == current_user_profile.interested_in,  # Match gender preference
-            UserProfile.city == current_user_profile.city,  # Match by city
-            UserProfile.birthdate.isnot(None)  # Ensure the birthdate is available
+            UserProfile.user_id != user_id,
+            UserProfile.gender == current_user_profile.interested_in,
+            UserProfile.city == current_user_profile.city,
+            UserProfile.birthdate.isnot(None)
         ).all()
 
-        # Further filter by age range
+        # Further filter by age range and shared interests
         matching_users = []
         for match in potential_matches:
-            match_age = today.year - match.birthdate.year - ((today.month, today.day) < (match.birthdate.month, match.birthdate.day))
+            match_age = today.year - match.birthdate.year - (
+                (today.month, today.day) < (match.birthdate.month, match.birthdate.day)
+            )
             if min_age <= match_age <= max_age:
-                # Check if the zodiac signs are compatible
-                if match.zodiac_sign in current_user_profile.compatible_zodiac_signs:
-                    # Check if there are common interests
-                    if set(current_user_profile.interests).intersection(set(match.interests)):
-                        matching_users.append({
-                            "user_id": match.user_id,
-                            "name": match.full_name,
-                            "age": match_age,
-                            "photo": match.profile_photo_url,  # Adjust if the photo URL is stored differently
-                            "city": match.city,
-                            "interests": match.interests,
-                            "zodiac_sign": match.zodiac_sign
-                        })
+                # Parse match's interests into a list
+                match_interests = set(match.interests.split(","))  # Assuming interests are comma-separated
+
+                # Check if there is at least one common interest
+                common_interests = user_interests.intersection(match_interests)
+                if common_interests:
+                    # Get the profile photo for the matched user (assuming the 'type' is 'profile')
+                    profile_photo = db.query(ProfilePhoto).filter(
+                        ProfilePhoto.user_id == match.user_id,
+                        ProfilePhoto.type == "profile"
+                    ).first()
+
+                    matching_users.append({
+                        "user_id": match.user_id,
+                        "name": match.full_name,
+                        "age": match_age,
+                        "city": match.city,
+                        "photo": profile_photo.url if profile_photo else None,
+                        "shared_interests": list(common_interests)
+                    })
 
         return matching_users
 
@@ -285,7 +299,10 @@ def get_matching_users(user_id: int, db: Session = Depends(get_db)):
     
 @router.get("/detailInfo/{user_id}")
 def detail_info(user_id: int, db: Session = Depends(get_db)):
-    usr_info, detail = get_user_by_id(db, user_id)
+    try:
+        usr_info, detail = get_user_by_id(db, user_id)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
     all_usr_info = {**usr_info.__dict__, **detail.__dict__}
     all_usr_info.pop("password")
     all_usr_info.pop("_sa_instance_state")
