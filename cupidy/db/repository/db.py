@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 # DATABASE_URL = "postgresql://postgres:passwd@localhost:5432/cupidywebsite"
 
 #ShineBoBo DATABASE_URL
-DATABASE_URL = "postgresql://postgres:    @localhost:5432/CupidyWebsite"
+DATABASE_URL = "postgresql://postgres:passwd@localhost:5432/cupidywebsite"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
