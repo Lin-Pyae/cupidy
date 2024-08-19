@@ -139,21 +139,25 @@ def sign_in(userinfo: dict = Body(...), db: Session = Depends(get_db)):
 
 @router.post("/otp-request")
 def reset_otp_request(useremail: dict = Body(...), db: Session = Depends(get_db)):
-    if "email" not in useremail:
-        return JSONResponse(content={"error":"email not provided"},status_code=400)
-    user = get_user_by_email(db, email=useremail["email"])
-    if not user:
-        return JSONResponse(content={"message":"user not found"}, status_code=404)
-    # sending otp mail to user
-    otp = send_otp(user.email)
+    try:
+        if "email" not in useremail:
+            return JSONResponse(content={"error":"email not provided"},status_code=400)
+        user = get_user_by_email(db, email=useremail["email"])
+        if not user:
+            return JSONResponse(content={"message":"user not found"}, status_code=404)
+        # sending otp mail to user
+        otp = send_otp(user.email)
 
-    # make the latest requested otp to be usable
-    make_only_one_usable_otp(db,user.id)
+        # make the latest requested otp to be usable
+        make_only_one_usable_otp(db,user.id)
 
-    expires_at = datetime.now() + timedelta(minutes=5)
-    create_password_reset_request(db, user.id, otp, expires_at)
-    return JSONResponse(content={"message":f"OTP {otp} has sent successfully"}, status_code=200)
+        expires_at = datetime.now() + timedelta(minutes=5)
+        create_password_reset_request(db, user.id, otp, expires_at)
+        return JSONResponse(content={"message":f"OTP {otp} has sent successfully"}, status_code=200)
 
+    except Exception as e:
+        logger.error(f"Error during otp request: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
         
 @router.post("/otp-validate")
 def otp_validation(otp: dict=Body(...), db: Session=Depends(get_db)):
