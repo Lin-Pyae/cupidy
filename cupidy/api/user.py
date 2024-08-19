@@ -167,13 +167,13 @@ def otp_validation(otp: dict=Body(...), db: Session=Depends(get_db)):
 
 @router.post("/password-reset")
 def reset_password(detail: dict=Body(...), db: Session=Depends(get_db)):
-    is_enough_info = set(["new_password","user_email"]) <= set(detail.keys())
+    is_enough_info = set(["new_password","user_id"]) <= set(detail.keys())
     if not is_enough_info:
         return JSONResponse(content={"error":"not enough informations provided"}, status_code=400)
     
     new_pass = pwd_context.hash(detail["new_password"])
     try:
-        change_password(db, detail["user_email"], new_pass)
+        change_password(db, detail["user_id"], new_pass)
     except Exception as e:
         return JSONResponse(content={"error":str(e)}, status_code=400)
     return JSONResponse(content={"message":"Successfully changed password"}, status_code=200)
@@ -390,10 +390,7 @@ def get_matching_users(user_id: int, db: Session = Depends(get_db)):
     
 @router.get("/detailInfo/{user_id}")
 def detail_info(user_id: int, db: Session = Depends(get_db)):
-    try:
-        usr_info, detail = get_user_by_id(db, user_id)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    usr_info, detail = get_user_by_id(db, user_id)
     all_usr_info = {**usr_info.__dict__, **detail.__dict__}
     all_usr_info.pop("password")
     all_usr_info.pop("_sa_instance_state")
