@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr, Field
 from passlib.context import CryptContext
 from typing import List, Optional
 from datetime import datetime, date
+from sqlalchemy import func
 
 from cupidy.db.repository.db import SessionLocal
 from cupidy.db.repository.user import (get_users, create_user, get_user_by_email,get_user_by_id,
@@ -109,16 +110,31 @@ def sign_in(userinfo: dict = Body(...), db: Session = Depends(get_db)):
 
     user_email = userinfo.get("email")
     user_password = userinfo.get("password")
-    db_user = get_user_by_email(db, email=user_email)
+    db_user = get_user_by_email(db, email=user_email)  # Assuming this function fetches a user by email
+
     if not db_user:
         return JSONResponse(content={"error": "User not found"}, status_code=404)
 
     db_user_pw = db_user.password
 
-    if not pwd_context.verify(user_password, db_user_pw):
-        return JSONResponse(content={"error": "Incorrect password"}, status_code=403)
-    access_token, refresh_token = generate_token({"user_id":db_user.id, "email":db_user.email})
-    return {"access_token":access_token, "refresh_token":refresh_token}
+    # Check if the stored password is a bcrypt hash (typically starts with $2a$, $2b$, or $2y$)
+    if db_user_pw.startswith("$2b$") or db_user_pw.startswith("$2a$") or db_user_pw.startswith("$2y$"):
+        # Verify hashed password
+        if not pwd_context.verify(user_password, db_user_pw):
+            return JSONResponse(content={"error": "Incorrect password"}, status_code=403)
+    else:
+        # Plain-text password comparison
+        if db_user_pw != user_password:
+            return JSONResponse(content={"error": "Incorrect password"}, status_code=403)
+        else:
+            # Rehash plain-text password and update it in the database
+            new_hashed_password = pwd_context.hash(user_password)
+            db_user.password = new_hashed_password
+            db.commit()
+
+    # Generate tokens after successful authentication
+    access_token, refresh_token = generate_token({"user_id": db_user.id, "email": db_user.email})
+    return {"access_token": access_token, "refresh_token": refresh_token}
 
 
 @router.post("/otp-request")
@@ -229,6 +245,11 @@ def get_user_photos(user_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error retrieving photos: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+import logging
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
+
 @router.get("/match/{user_id}")
 def get_matching_users(user_id: int, db: Session = Depends(get_db)):
     try:
@@ -240,55 +261,125 @@ def get_matching_users(user_id: int, db: Session = Depends(get_db)):
         # Calculate age from birthdate
         if not current_user_profile.birthdate:
             raise HTTPException(status_code=400, detail="Birthdate not available for age calculation")
+        
         today = datetime.today().date()
         age = today.year - current_user_profile.birthdate.year - (
             (today.month, today.day) < (current_user_profile.birthdate.month, current_user_profile.birthdate.day)
         )
-
-        # Determine the age range (4 years younger and older)
         min_age = age - 4
         max_age = age + 4
 
-        # Parse interests into a list
-        user_interests = set(current_user_profile.interests.split(","))
+        # Process user interests
+        if isinstance(current_user_profile.interests, str):
+            user_interests = set(interest.strip().lower() for interest in current_user_profile.interests.split(","))
+        else:
+            user_interests = set(interest.strip().lower() for interest in current_user_profile.interests)
 
         # Find potential matches
         potential_matches = db.query(UserProfile).filter(
             UserProfile.user_id != user_id,
-            UserProfile.gender == current_user_profile.interested_in,
-            UserProfile.city == current_user_profile.city,
+            func.lower(UserProfile.gender) == current_user_profile.interested_in.lower(),
             UserProfile.birthdate.isnot(None)
         ).all()
 
-        # Further filter by age range and shared interests
+        logger.debug(f"Found {len(potential_matches)} potential matches.")
+
+        # Filter by age range and shared interests
         matching_users = []
+        other_users = []
         for match in potential_matches:
             match_age = today.year - match.birthdate.year - (
                 (today.month, today.day) < (match.birthdate.month, match.birthdate.day)
             )
             if min_age <= match_age <= max_age:
-                # Parse match's interests into a list
-                match_interests = set(match.interests.split(","))  # Assuming interests are comma-separated
+                if isinstance(match.interests, str):
+                    match_interests = set(interest.strip().lower() for interest in match.interests.split(","))
+                else:
+                    match_interests = set(interest.strip().lower() for interest in match.interests)
 
-                # Check if there is at least one common interest
                 common_interests = user_interests.intersection(match_interests)
-                if common_interests:
-                    # Get the profile photo for the matched user (assuming the 'type' is 'profile')
-                    profile_photo = db.query(ProfilePhoto).filter(
-                        ProfilePhoto.user_id == match.user_id,
-                        ProfilePhoto.type == "profile"
-                    ).first()
+                logger.debug(f"Common interests for user {match.user_id}: {common_interests}")
+                
+                # Get both profile and cover photos
+                profile_photo = db.query(ProfilePhoto).filter(
+                    ProfilePhoto.user_id == match.user_id,
+                    ProfilePhoto.type == "profile"
+                ).first()
 
-                    matching_users.append({
-                        "user_id": match.user_id,
-                        "name": match.full_name,
-                        "age": match_age,
-                        "city": match.city,
-                        "photo": profile_photo.url if profile_photo else None,
-                        "shared_interests": list(common_interests)
-                    })
+                cover_photo = db.query(ProfilePhoto).filter(
+                    ProfilePhoto.user_id == match.user_id,
+                    ProfilePhoto.type == "coverPhoto"
+                ).first()
 
-        return matching_users
+                user_data = {
+                    "user_id": match.user_id,
+                    "name": match.full_name,
+                    "age": match_age,
+                    "city": match.city,
+                    "gender": match.gender,
+                    "interested_in": match.interested_in,
+                    "zodiac_sign": match.zodiac_sign,
+                    "mbti": match.mbti,
+                    "country_name": match.country_name,
+                    "locality": match.locality,
+                    "profile_photo": profile_photo.url if profile_photo else None,
+                    "cover_photo": cover_photo.url if cover_photo else None,
+                    "shared_interests": list(common_interests)
+                }
+
+                if len(common_interests) >= 2:  # Ensure at least 2 common interests
+                    matching_users.append(user_data)
+                else:
+                    other_users.append(user_data)
+
+        # Sort matches by the number of shared interests (most to least)
+        matching_users.sort(key=lambda x: len(x["shared_interests"]), reverse=True)
+
+        # Add other users who match the `interested_in` criterion but have no common interests
+        other_additional_matches = db.query(UserProfile).filter(
+            UserProfile.user_id != user_id,
+            func.lower(UserProfile.gender) == current_user_profile.interested_in.lower(),
+            ~UserProfile.user_id.in_([user["user_id"] for user in matching_users + other_users])
+        ).all()
+
+        logger.debug(f"Found {len(other_additional_matches)} additional users with no shared interests.")
+
+        for match in other_additional_matches:
+            match_age = today.year - match.birthdate.year - (
+                (today.month, today.day) < (match.birthdate.month, match.birthdate.day)
+            )
+
+            # Get both profile and cover photos
+            profile_photo = db.query(ProfilePhoto).filter(
+                ProfilePhoto.user_id == match.user_id,
+                ProfilePhoto.type == "profile"
+            ).first()
+
+            cover_photo = db.query(ProfilePhoto).filter(
+                ProfilePhoto.user_id == match.user_id,
+                ProfilePhoto.type == "coverPhoto"
+            ).first()
+
+            other_users.append({
+                "user_id": match.user_id,
+                "name": match.full_name,
+                "age": match_age,
+                "city": match.city,
+                "gender": match.gender,
+                "interested_in": match.interested_in,
+                "zodiac_sign": match.zodiac_sign,
+                "mbti": match.mbti,
+                "country_name": match.country_name,
+                "locality": match.locality,
+                "profile_photo": profile_photo.url if profile_photo else None,
+                "cover_photo": cover_photo.url if cover_photo else None,
+                "shared_interests": []
+            })
+
+        # Combine matching users with shared interests first, followed by other users
+        final_result = matching_users + other_users
+
+        return final_result
 
     except HTTPException as http_exc:
         logger.error(f"HTTP error: {http_exc.detail}")
