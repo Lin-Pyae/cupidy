@@ -52,13 +52,12 @@ class ProfilePhoto(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # ForeignKey to User
     # user_profile_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)  # ForeignKey to UserProfile
     title = Column(String)
-    blob = Column(LargeBinary, nullable=False)
-    # url = Column(Text, nullable=False)
+    url = Column(Text, nullable=True)  # URL for the photo, can be null if it's a local file
+    type = Column(String, nullable=False)  # Type of photo: 'profile', 'coverPhoto', 'gallery'
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     
-    # Relationships
-    # user_profile = relationship("UserProfile", back_populates="photos")
+    # Relationship back to User
     user = relationship("User", back_populates="photos")
 
 class PasswordResetRequest(Base):

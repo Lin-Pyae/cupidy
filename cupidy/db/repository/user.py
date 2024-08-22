@@ -39,15 +39,13 @@ from uuid import uuid4
 #     return photo
 
 #Saving User Photos in database
-def save_profile_photo(file: UploadFile, user_id: int, db: Session):
-    # Read the file content as binary data
-    file_data = file.file.read()
-    
-    # Create a database entry with the binary data
+def save_profile_photo(photo_data: dict, user_id: int, db: Session):
+    # Create a database entry using the URL format
     photo = ProfilePhoto(
         user_id=user_id,
-        title=file.filename,
-        blob=file_data,
+        title=photo_data.get('title', 'Untitled'),
+        url=photo_data['url'],  # Ensure 'url' is present in the incoming data
+        type=photo_data.get('type', 'gallery'),  # Default to 'gallery' if 'type' is not provided
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
@@ -63,6 +61,13 @@ def get_users(db: Session):
 # Getting a user by email
 def get_user_by_email(db: Session, email: EmailStr):
     return db.query(User).filter(User.email == email).first()
+
+# Getting a user by id
+def get_user_by_id(db: Session, id: int):
+    user = db.query(User,UserProfile).join(UserProfile).filter(User.id == id).first()
+    if not user:
+        raise Exception("User not found")
+    return user
 
 # Creating a new user
 def create_user(db: Session, user, hashed_password: str):
@@ -100,18 +105,6 @@ def create_user_profile(db: Session, user_profile, user_id: int):
     db.refresh(db_profile)
     return db_profile
 
-# Adding a profile photo
-def add_profile_photo(db: Session, photo):
-    db_photo = ProfilePhoto(
-        user_profile_id=photo.user_profile_id,
-        title=photo.title,
-        url=photo.url
-    )
-    db.add(db_photo)
-    db.commit()
-    db.refresh(db_photo)
-    return db_photo
-
 # Creating a password reset request
 def create_password_reset_request(db: Session, user_id: int, otp: str, expires_at):
     db_reset_request = PasswordResetRequest(
@@ -148,8 +141,8 @@ def OTP_validation(db: Session, otp: str):
 
     db.commit()
 
-def change_password(db: Session, user_id, new_password):
-    user = db.query(User).filter(User.id == user_id).first()
+def change_password(db: Session, user_email, new_password):
+    user = db.query(User).filter(User.email == user_email).first()
     if not user:
         raise Exception("User not found")
     

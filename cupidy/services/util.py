@@ -6,6 +6,7 @@ import jwt
 def checkTokenValidation(token, secret_key):
     try:
         decode = jwt.decode(token,secret_key,"HS256")
+        return decode
     except InvalidSignatureError:
         raise AuthenticationError("Invalid token type")
     except ExpiredSignatureError:
