@@ -72,3 +72,19 @@ class PasswordResetRequest(Base):
     
     # Relationship back to User
     user = relationship("User", back_populates="password_reset_requests")
+
+class Match(Base):
+    __tablename__ = "matches"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    liked_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    if_match = Column(Boolean, default=False, nullable=False)
+    current_user_liked = Column(Boolean, default=False, nullable=False)
+    liked_user_likedBack = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships back to User
+    user = relationship("User", foreign_keys=[user_id], back_populates="matches_sent")
+    liked_user = relationship("User", foreign_keys=[liked_user_id], back_populates="matches_received")
