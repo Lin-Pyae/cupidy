@@ -6,7 +6,10 @@ from sqlalchemy.orm import sessionmaker
 # DATABASE_URL = "postgresql://postgres:passwd@localhost:5432/cupidywebsite"
 
 #ShineBoBo DATABASE_URL
-DATABASE_URL = "postgresql://postgres:admin123@localhost:5433/cupidy"
+# DATABASE_URL = "postgresql://postgres:admin123@localhost:5433/cupidy"
+
+#live db url
+DATABASE_URL = "postgresql://default:9Y6PzAMmLfVy@ep-rapid-darkness-a436kdwv.us-east-1.aws.neon.tech:5432/verceldb?sslmode=require"
 
 
 engine = create_engine(DATABASE_URL)
