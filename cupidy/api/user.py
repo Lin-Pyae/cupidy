@@ -480,6 +480,16 @@ def get_user_matches(user_id: int, db: Session = Depends(get_db)):
         if not matches:
             raise HTTPException(status_code=404, detail="No matches found")
 
+        current_user_liked_count = db.query(func.count().label('count')).filter(
+            Match.user_id == user_id,
+            Match.current_user_liked == True
+        ).scalar()
+
+        liked_user_likedBack_count = db.query(func.count().label('count')).filter(
+            Match.user_id == user_id,
+            Match.liked_user_likedBack == True
+        ).scalar()
+
         # Fetch detailed information about the matched users
         matched_users = []
         for match in matches:
@@ -506,7 +516,7 @@ def get_user_matches(user_id: int, db: Session = Depends(get_db)):
 
                 matched_users.append(user_data)
 
-        return {"matches": matched_users}
+        return {"matches": matched_users, "totalLikes_get":liked_user_likedBack_count, "totalLikes_give":current_user_liked_count}
 
     except HTTPException as he:
         logger.error(f"HTTP error during fetching matches: {str(he)}")
