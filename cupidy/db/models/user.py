@@ -18,9 +18,12 @@ class User(Base):
     profile = relationship("UserProfile", back_populates="user", uselist=False)
     # Relationship to ProfilePhoto
     photos = relationship("ProfilePhoto", back_populates="user")
-
     # Relationship to PasswordResetRequest
     password_reset_requests = relationship("PasswordResetRequest", back_populates="user")
+     # Relationship to Match: matches sent by the user
+    matches_sent = relationship("Match", foreign_keys="[Match.user_id]", back_populates="user")
+    # Relationship to Match: matches received by the user
+    matches_received = relationship("Match", foreign_keys="[Match.liked_user_id]", back_populates="liked_user")
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"

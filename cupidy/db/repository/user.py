@@ -148,3 +148,8 @@ def change_password(db: Session, user_email, new_password):
     
     user.password = new_password
     db.commit()
+
+def calculate_age(birthdate):
+    today = datetime.today()
+    age = today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
+    return age

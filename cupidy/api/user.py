@@ -10,11 +10,12 @@ from cupidy.db.repository.db import SessionLocal
 from cupidy.db.repository.user import (get_users, create_user, get_user_by_email,get_user_by_id,
                                         create_password_reset_request,
                                           make_only_one_usable_otp, OTP_validation,
-                                          change_password, create_user_profile, save_profile_photo)
+                                          change_password, create_user_profile, save_profile_photo
+                                          , calculate_age)
 from fastapi.responses import JSONResponse
 from cupidy.services.email import send_otp
 from datetime import datetime, timedelta
-from cupidy.db.models.user import User, UserProfile, ProfilePhoto
+from cupidy.db.models.user import User, UserProfile, ProfilePhoto, Match
 from cupidy.services.auth import generate_token
 
 router = APIRouter()
@@ -403,3 +404,113 @@ def detail_info(user_id: int, db: Session = Depends(get_db)):
     all_usr_info.pop("_sa_instance_state")
     all_usr_info.pop("id")
     return all_usr_info
+
+@router.post("/{user_id}/like/{liked_user_id}")
+def like_user(user_id: int, liked_user_id: int, db: Session = Depends(get_db)):
+    try:
+        # Check if the user is trying to like themselves
+        if user_id == liked_user_id:
+            raise HTTPException(status_code=400, detail="You cannot like yourself")
+
+        # Fetch the match entry between the current user and the liked user
+        existing_match = db.query(Match).filter(
+            Match.user_id == user_id,
+            Match.liked_user_id == liked_user_id
+        ).first()
+
+        if existing_match:
+            if existing_match.current_user_liked:
+                raise HTTPException(status_code=400, detail="You have already liked this user")
+            else:
+                existing_match.current_user_liked = True
+
+                # Check for mutual match
+                reciprocal_match = db.query(Match).filter(
+                    Match.user_id == liked_user_id,
+                    Match.liked_user_id == user_id
+                ).first()
+
+                if reciprocal_match and reciprocal_match.current_user_liked:
+                    existing_match.if_match = True
+                    reciprocal_match.if_match = True
+                    reciprocal_match.liked_user_likedBack = True
+
+                db.commit()
+                return {"message": "User liked successfully"}
+        else:
+            # Create a new match entry
+            new_match = Match(
+                user_id=user_id,
+                liked_user_id=liked_user_id,
+                current_user_liked=True
+            )
+            db.add(new_match)
+            db.commit()
+
+            # Check for mutual match
+            reciprocal_match = db.query(Match).filter(
+                Match.user_id == liked_user_id,
+                Match.liked_user_id == user_id
+            ).first()
+
+            if reciprocal_match and reciprocal_match.current_user_liked:
+                new_match.if_match = True
+                reciprocal_match.if_match = True
+                reciprocal_match.liked_user_likedBack = True
+                db.commit()
+
+            return {"message": "User liked successfully"}
+
+    except HTTPException as he:
+        logger.error(f"HTTP error during like operation: {str(he)}")
+        raise he
+    except Exception as e:
+        logger.error(f"Unexpected error during like operation: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+@router.get("/matches/{user_id}")
+def get_user_matches(user_id: int, db: Session = Depends(get_db)):
+    try:
+        # Fetch all mutual matches for the current user
+        matches = db.query(Match).filter(
+            Match.user_id == user_id,
+            Match.if_match == True
+        ).all()
+
+        if not matches:
+            raise HTTPException(status_code=404, detail="No matches found")
+
+        # Fetch detailed information about the matched users
+        matched_users = []
+        for match in matches:
+            liked_user = db.query(User).filter(User.id == match.liked_user_id).first()
+            if liked_user:
+                profile = liked_user.profile
+                profile_photo = next((photo for photo in liked_user.photos if photo.type == "profile"), None)
+                cover_photo = next((photo for photo in liked_user.photos if photo.type == "coverPhoto"), None)
+                
+                user_data = {
+                    "user_id": liked_user.id,
+                    "name": profile.full_name,
+                    "age": calculate_age(profile.birthdate) if profile.birthdate else None,
+                    "city": profile.city,
+                    "gender": profile.gender,
+                    "interested_in": profile.interested_in,
+                    "zodiac_sign": profile.zodiac_sign,
+                    "mbti": profile.mbti,
+                    "country_name": profile.country_name,
+                    "locality": profile.locality,
+                    "profile_photo": profile_photo.url if profile_photo else None,
+                    "cover_photo": cover_photo.url if cover_photo else None,
+                }
+
+                matched_users.append(user_data)
+
+        return {"matches": matched_users}
+
+    except HTTPException as he:
+        logger.error(f"HTTP error during fetching matches: {str(he)}")
+        raise he
+    except Exception as e:
+        logger.error(f"Unexpected error during fetching matches: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
